@@ -12,7 +12,7 @@ synthesize_results() {
   # Parse agent results
   local agent_count=$(echo "$all_results" | jq 'length')
   local total_sources=$(echo "$all_results" | jq '[.[].sources | length] | add // 0')
-  local total_cost=$(echo "$all_results" | jq -r '[.[].cost_estimate | ltrimstr("$") | tonumber] | add // 0')
+  local total_cost=$(echo "$all_results" | jq -r '[.[].cost_estimate // "$0.00" | ltrimstr("$") | tonumber] | add // 0')
   
   # Build findings summary (all_results is already an array)
   local findings_summary=$(echo "$all_results" | jq '
