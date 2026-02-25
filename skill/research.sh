@@ -5,6 +5,8 @@
 #
 
 set -e
+# Don't exit on background process failures
+set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"
@@ -136,7 +138,7 @@ done
 # Wait for completion
 info "→ Waiting for agents to complete..."
 for pid in "${AGENT_PIDS[@]}"; do
-  wait $pid
+  wait $pid || true
   info "  Agent completed (pid: $pid)"
 done
 info ""
