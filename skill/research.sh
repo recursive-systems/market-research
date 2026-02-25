@@ -122,6 +122,9 @@ RESEARCH_PLAN=$(generate_research_plan "$TOPIC" "$FOCUS" "$DEPTH")
 info "✓ Plan generated: $AGENT_COUNT parallel tracks"
 info ""
 
+# Initialize agent directory
+init_agent_dir
+
 # Spawn agents
 info "→ Spawning $AGENT_COUNT research agents..."
 AGENT_PIDS=()
