@@ -8,7 +8,7 @@ AGENT_OUTPUT_DIR="${AGENT_OUTPUT_DIR:-$HOME/.openclaw/workspace-dev/.research-ag
 # Initialize agent output directory
 init_agent_dir() {
   mkdir -p "$AGENT_OUTPUT_DIR"
-  rm -f "$AGENT_OUTPUT_DIR"/agent-*.json 2>/dev/null
+  rm -f "$AGENT_OUTPUT_DIR"/{agent-*.json,agent-*.log} 2>/dev/null || true
 }
 
 # Generate research plan
