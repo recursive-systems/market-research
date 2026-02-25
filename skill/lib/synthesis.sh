@@ -14,8 +14,8 @@ synthesize_results() {
   local total_sources=$(echo "$all_results" | jq '[.[].sources | length] | add // 0')
   local total_cost=$(echo "$all_results" | jq -r '[.[].cost_estimate | ltrimstr("$") | tonumber] | add // 0')
   
-  # Build findings summary
-  local findings_summary=$(echo "$all_results" | jq -s '
+  # Build findings summary (all_results is already an array)
+  local findings_summary=$(echo "$all_results" | jq '
     {
       competitors: [.[].findings.competitors // [] | .[]] | unique,
       trends: [.[].findings.trends // [] | .[]] | unique,
