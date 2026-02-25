@@ -25,7 +25,7 @@ log() { echo -e "${BLUE}[$(date +%H:%M:%S)]${NC} $*"; }
 info() { echo -e "${GREEN}→${NC} $*"; }
 warn() { echo -e "${YELLOW}⚠${NC} $*" >&2; }
 error() { echo -e "${RED}✗${NC} $*" >&2; }
-verbose() { [[ "$VERBOSE" == "true" ]] && echo -e "${CYAN}ℹ${NC} $*"; }
+verbose() { [[ "$VERBOSE" == "true" ]] && echo -e "${CYAN}ℹ${NC} $*"; return 0; }
 
 # Show help
 show_help() {
