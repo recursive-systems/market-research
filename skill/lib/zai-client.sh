@@ -103,8 +103,8 @@ zai_generate_queries() {
   local response=$(zai_chat_completion "glm-5" "$messages" "[]" "0.3")
   local content=$(zai_extract_content "$response")
   
-  # Try to extract JSON array from content
-  echo "$content" | grep -oP '\[.*?\]' | head -1
+  # Try to extract JSON array from content (macOS compatible)
+  echo "$content" | grep -oE '\[[^\]]*\]' | head -1
 }
 
 # Synthesize findings via GLM-5

@@ -138,13 +138,15 @@ $loop_findings"
   done
   
   # Finalize
-  agent_result=$(echo "$agent_result" | jq \"
-    .status = \"completed\" |
-    .completed_at = \"$(timestamp)\" |
-    .cost_estimate = \"\$(format_currency $total_cost)\" |
-    .tokens_used.input = $total_input_tokens |
-    .tokens_used.output = $total_output_tokens
-  \")
+  local formatted_cost=$(format_currency $total_cost)
+  local ts=$(timestamp)
+  agent_result=$(echo "$agent_result" | jq \
+    --arg status "completed" \
+    --arg completed_at "$ts" \
+    --arg cost_estimate "$formatted_cost" \
+    --argjson input_tokens $total_input_tokens \
+    --argjson output_tokens $total_output_tokens \
+    '.status = $status | .completed_at = $completed_at | .cost_estimate = $cost_estimate | .tokens_used.input = $input_tokens | .tokens_used.output = $output_tokens')
   
   echo "$agent_result" > "$output_file"
   verbose "$agent_id: Completed (cost: \$$(format_currency $total_cost))"
@@ -159,8 +161,8 @@ generate_followup_queries() {
   local synthesis=$(zai_synthesize "$findings" "$topic")
   local content=$(zai_extract_content "$synthesis")
   
-  # Extract queries from synthesis (simplified)
-  echo "$content" | grep -oP '(?<=follow-up|query|search).*' | head -3
+  # Extract queries from synthesis (simplified, macOS compatible)
+  echo "$content" | grep -oE '(follow-up|query|search).{0,100}' | head -3
 }
 
 # Collect results from all agents
