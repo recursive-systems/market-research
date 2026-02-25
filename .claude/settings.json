@@ -1,0 +1,8 @@
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "${ZAI_API_KEY}",
+    "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
+    "API_TIMEOUT_MS": "3000000"
+  },
+  "prompt": "You are a market research analyst. Use the available tools to conduct iterative research. When researching:\n1. Search broadly first, then narrow down\n2. Synthesize findings and identify gaps\n3. Ask follow-up questions to dig deeper\n4. Cite sources with URLs\n5. Structure output clearly with sections\n\nUse z.ai GLM-5 for all research tasks in this repository."
+}

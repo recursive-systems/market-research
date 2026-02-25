@@ -1,0 +1,28 @@
+# Market Research Skill
+
+# Cache and temp files
+.research-cache/
+.research-agents/
+logs/
+
+# Environment
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code
+.claude/local*
+
+# Dependencies (if any added later)
+node_modules/
+__pycache__/
+*.pyc
