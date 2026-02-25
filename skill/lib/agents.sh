@@ -150,6 +150,7 @@ $loop_findings"
   
   echo "$agent_result" > "$output_file"
   verbose "$agent_id: Completed (cost: \$$(format_currency $total_cost))"
+  return 0
 }
 
 # Generate follow-up queries based on findings
