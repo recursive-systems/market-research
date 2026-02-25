@@ -203,4 +203,5 @@ report_costs() {
   info "Claude equiv:  ~\$$(format_currency $(echo "scale=2; $total_cost * 3" | bc))"
   info "Savings:       ~67%"
   info "════════════════════════════════════════════════════════════"
+  return 0
 }
