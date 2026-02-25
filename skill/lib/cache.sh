@@ -59,13 +59,14 @@ cache_results() {
   local cache_file="$CACHE_DIR/${cache_hash}.json"
   
   # Add metadata to cache
+  local results_escaped=$(json_escape "$results")
   local cached_data=$(cat << EOF
 {
   "cached_at": "$(timestamp)",
   "topic": $(json_escape "$topic"),
   "depth": "$depth",
   "focus": "$focus",
-  "results": $results
+  "results": $results_escaped
 }
 EOF
 )
