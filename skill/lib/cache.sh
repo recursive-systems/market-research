@@ -72,6 +72,7 @@ EOF
   
   echo "$cached_data" > "$cache_file"
   verbose "Cached to: $cache_file"
+  return 0
 }
 
 # List cached research
