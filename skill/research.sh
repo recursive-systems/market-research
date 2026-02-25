@@ -95,7 +95,7 @@ info "Depth:    $DEPTH ($AGENT_COUNT agents, $LOOPS_PER_AGENT loops)"
 info "Focus:    $FOCUS"
 info "Output:   $OUTPUT"
 info "Cache:    $USE_CACHE"
-info "Max cost: $${MAX_COST}"
+info "Max cost: \$${MAX_COST}"
 info ""
 
 # Check cache

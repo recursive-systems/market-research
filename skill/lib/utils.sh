@@ -93,12 +93,16 @@ configure_depth() {
   esac
 }
 
-# Generate cache hash
+# Generate cache hash (macOS compatible)
 generate_cache_hash() {
   local topic="$1"
   local depth="$2"
   local focus="$3"
-  echo -n "${topic}:${depth}:${focus}" | sha256sum | cut -d' ' -f1
+  if command -v sha256sum &> /dev/null; then
+    echo -n "${topic}:${depth}:${focus}" | sha256sum | cut -d' ' -f1
+  else
+    echo -n "${topic}:${depth}:${focus}" | shasum -a 256 | cut -d' ' -f1
+  fi
 }
 
 # Calculate cost from tokens
