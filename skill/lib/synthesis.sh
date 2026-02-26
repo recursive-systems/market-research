@@ -3,6 +3,85 @@
 # lib/synthesis.sh — Findings synthesis and output formatting
 #
 
+# Generate PDF from markdown using pandoc (or fallback to HTML)
+# Usage: generate_pdf "markdown_content" "output_file.pdf"
+generate_pdf() {
+  local markdown_content="$1"
+  local output_file="$2"
+  local topic="$3"
+  
+  # Create temp directory
+  local tmp_dir=$(mktemp -d)
+  local md_file="$tmp_dir/report.md"
+  local html_file="$tmp_dir/report.html"
+  
+  # Write markdown
+  echo "$markdown_content" > "$md_file"
+  
+  # Add styling and convert to HTML first
+  cat > "$html_file" << EOF
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Market Research: $topic</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 900px; margin: 40px auto; padding: 20px; color: #333; }
+h1 { color: #1a1a1a; border-bottom: 3px solid #4a90d9; padding-bottom: 10px; }
+h2 { color: #2a2a2a; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; margin-top: 30px; }
+h3 { color: #3a3a3a; margin-top: 25px; }
+table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+th { background: #4a90d9; color: white; font-weight: 600; }
+tr:nth-child(even) { background: #f8f9fa; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Monaco', monospace; }
+blockquote { border-left: 4px solid #4a90d9; margin: 20px 0; padding: 10px 20px; background: #f8f9fa; }
+ul, ol { margin: 15px 0; }
+li { margin: 8px 0; }
+strong { color: #1a1a1a; }
+hr { border: none; border-top: 2px solid #e0e0e0; margin: 30px 0; }
+</style>
+</head>
+<body>
+EOF
+  
+  # Convert markdown to HTML body (using basic sed for now, could use pandoc if available)
+  # Simple markdown to HTML conversion
+  local html_body=$(echo "$markdown_content" | sed \
+    -e 's/^# \(.*\)/<h1>\1<\/h1>/' \
+    -e 's/^## \(.*\)/<h2>\1<\/h2>/' \
+    -e 's/^### \(.*\)/<h3>\1<\/h3>/' \
+    -e 's/^\*\*\(.*\)\*\*/<strong>\1<\/strong>/g' \
+    -e 's/^\* \(.*\)/<li>\1<\/li>/' \
+    -e 's/^- \(.*\)/<li>\1<\/li>/' \
+    -e 's/^| \(.*\) |/<tr><td>\1<\/td>/g' \
+    -e 's/| <td>/<td>/g' \
+    -e 's/<\/td> |/<\/td>/g' \
+    -e 's/---/<hr>/g')
+  
+  echo "$html_body" >> "$html_file"
+  echo "</body></html>" >> "$html_file"
+  
+  # Try to convert to PDF
+  if command -v wkhtmltopdf &> /dev/null; then
+    wkhtmltopdf --quiet --enable-local-file-access "$html_file" "$output_file" 2>/dev/null
+  elif command -v pandoc &> /dev/null; then
+    pandoc "$md_file" -o "$output_file" --pdf-engine=xelatex 2>/dev/null || \
+    pandoc "$md_file" -o "$output_file" 2>/dev/null
+  else
+    # Fallback: create a styled HTML file that can be printed to PDF
+    cp "$html_file" "${output_file%.pdf}.html"
+    # Create a placeholder PDF with instructions
+    echo "PDF generation requires wkhtmltopdf or pandoc. HTML version saved to: ${output_file%.pdf}.html" >&2
+    return 1
+  fi
+  
+  # Cleanup
+  rm -rf "$tmp_dir"
+  
+  return 0
+}
+
 # Synthesize all agent results into final output
 synthesize_results() {
   local all_results="$1"

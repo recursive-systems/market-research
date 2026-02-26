@@ -40,9 +40,10 @@ Arguments:
 Options:
   --depth MODE             Research depth: shallow|standard|deep (default: standard)
   --focus AREA             Focus: all|competitors|trends|pricing|customers|gaps
-  --output FORMAT          Output: markdown|json|brief (default: markdown)
+  --output FORMAT          Output: markdown|json|brief|pdf (default: markdown)
   --max-cost USD           Max spend limit (default: 5)
   --cache true|false       Use cached results (default: true)
+  --discord-channel ID     Discord channel to send PDF report to
   --verbose, -v            Show detailed progress
   --help, -h               Show this help
 
@@ -50,6 +51,12 @@ Examples:
   research.sh "AI coding assistants" --depth deep --focus competitors
   research.sh "CRM market" --depth shallow --focus pricing --max-cost 2
   research.sh "vertical AI" --depth standard --output json
+  research.sh "SaaS market" --depth standard --output pdf --discord-channel 1475880024111583243
+
+PDF Output:
+  Use --output pdf to generate a styled PDF report.
+  Combine with --discord-channel to automatically send to Discord.
+  Requires wkhtmltopdf or pandoc for PDF generation.
 
 Environment:
   ZAI_API_KEY              Required. Get from https://z.ai/model-api

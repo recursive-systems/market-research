@@ -26,6 +26,7 @@ MAX_COST=5
 USE_CACHE=true
 TOPIC=""
 VERBOSE=false
+DISCORD_CHANNEL=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -48,6 +49,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --cache)
       USE_CACHE="$2"
+      shift 2
+      ;;
+    --discord-channel)
+      DISCORD_CHANNEL="$2"
       shift 2
       ;;
     --verbose|-v)
@@ -158,8 +163,47 @@ info ""
 # Cache results
 cache_results "$TOPIC" "$DEPTH" "$FOCUS" "$FINAL_OUTPUT"
 
-# Display output
-echo "$FINAL_OUTPUT"
+# Handle output based on format
+if [[ "$OUTPUT" == "pdf" ]]; then
+  # Generate PDF
+  local pdf_file="$HOME/.openclaw/market-research-reports/Research-${TOPIC// /_}-$(date +%Y%m%d-%H%M%S).pdf"
+  mkdir -p "$HOME/.openclaw/market-research-reports"
+  
+  info "→ Generating PDF..."
+  if generate_pdf "$FINAL_OUTPUT" "$pdf_file" "$TOPIC"; then
+    info "✓ PDF generated: $pdf_file"
+    
+    # Send to Discord if channel specified
+    if [[ -n "$DISCORD_CHANNEL" ]]; then
+      info "→ Sending to Discord..."
+      # Use OpenClaw's message tool or curl to Discord webhook
+      if command -v message &> /dev/null; then
+        message action=send channel=discord target="$DISCORD_CHANNEL" \
+          message="🔬 Market Research Complete: $TOPIC" \
+          filePath="$pdf_file" 2>/dev/null || warn "Could not send to Discord"
+      else
+        warn "Discord message tool not available, PDF saved to: $pdf_file"
+      fi
+    fi
+    
+    # Also output summary to console
+    echo ""
+    echo "════════════════════════════════════════════════════════════"
+    echo "PDF REPORT GENERATED"
+    echo "════════════════════════════════════════════════════════════"
+    echo "File: $pdf_file"
+    echo "Topic: $TOPIC"
+    [[ -n "$DISCORD_CHANNEL" ]] && echo "Sent to Discord channel: $DISCORD_CHANNEL"
+    echo "════════════════════════════════════════════════════════════"
+    echo ""
+  else
+    warn "PDF generation failed, outputting markdown instead:"
+    echo "$FINAL_OUTPUT"
+  fi
+else
+  # Display markdown/json/brief output
+  echo "$FINAL_OUTPUT"
+fi
 
 # Report costs
 report_costs "$COLLECTED_RESULTS"
