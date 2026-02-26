@@ -63,16 +63,26 @@ EOF
   echo "</body></html>" >> "$html_file"
   
   # Try to convert to PDF
-  if command -v wkhtmltopdf &> /dev/null; then
-    wkhtmltopdf --quiet --enable-local-file-access "$html_file" "$output_file" 2>/dev/null
-  elif command -v pandoc &> /dev/null; then
-    pandoc "$md_file" -o "$output_file" --pdf-engine=xelatex 2>/dev/null || \
-    pandoc "$md_file" -o "$output_file" 2>/dev/null
-  else
+  local pdf_success=false
+  
+  if /opt/homebrew/bin/pandoc --version &> /dev/null || command -v pandoc &> /dev/null; then
+    # Try pandoc with pdf-engine first, then without
+    if pandoc "$md_file" -o "$output_file" --pdf-engine=xelatex 2>/dev/null; then
+      pdf_success=true
+    elif pandoc "$md_file" -o "$output_file" 2>/dev/null; then
+      pdf_success=true
+    fi
+  elif command -v wkhtmltopdf &> /dev/null; then
+    if wkhtmltopdf --quiet --enable-local-file-access "$html_file" "$output_file" 2>/dev/null; then
+      pdf_success=true
+    fi
+  fi
+  
+  if [[ "$pdf_success" != "true" ]]; then
     # Fallback: create a styled HTML file that can be printed to PDF
     cp "$html_file" "${output_file%.pdf}.html"
-    # Create a placeholder PDF with instructions
-    echo "PDF generation requires wkhtmltopdf or pandoc. HTML version saved to: ${output_file%.pdf}.html" >&2
+    echo "PDF generation requires wkhtmltopdf or pandoc with LaTeX. HTML version saved to: ${output_file%.pdf}.html" >&2
+    rm -rf "$tmp_dir"
     return 1
   fi
   
