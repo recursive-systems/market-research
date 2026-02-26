@@ -57,13 +57,17 @@ zai_chat() {
   local user_message="$2"
   local temperature="${3:-0.7}"
   
+  # Escape strings for JSON
+  local system_escaped=$(echo "$system_prompt" | jq -Rs '.[:-1]')
+  local user_escaped=$(echo "$user_message" | jq -Rs '.[:-1]')
+  
   local payload_file=$(mktemp)
   cat > "$payload_file" << EOF
 {
   "model": "glm-5",
   "messages": [
-    {"role": "system", "content": $(jq -Rs . <<< "$system_prompt")},
-    {"role": "user", "content": $(jq -Rs . <<< "$user_message")}
+    {"role": "system", "content": $system_escaped},
+    {"role": "user", "content": $user_escaped}
   ],
   "temperature": $temperature,
   "max_tokens": 4096
