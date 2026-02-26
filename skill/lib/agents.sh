@@ -115,26 +115,61 @@ EOF
       queries=$(generate_followup_queries "$topic" "$all_findings")
     fi
     
-    # Execute searches (mock for now - in real impl would call zai)
-    local loop_findings="Loop $current_loop findings for $topic"
-    local loop_cost=0.5
-    local loop_input=1000
-    local loop_output=3000
+    # Execute real web searches
+    local loop_findings=""
+    local loop_input_tokens=0
+    local loop_output_tokens=0
+    local search_count=0
     
-    # Accumulate
+    # Execute each query and analyze results
+    while IFS= read -r query; do
+      [[ -z "$query" ]] && continue
+      
+      verbose "$agent_id: Searching: $query"
+      
+      # Perform web search using OpenClaw's web_search (Brave API)
+      local search_results
+      if command -v web_search &> /dev/null; then
+        search_results=$(web_search "$query" 2>/dev/null)
+      else
+        # Fallback to curl with Brave API if available
+        search_results=$(curl -s "https://api.search.brave.com/res/v1/web/search?q=$(jq -RsR @uri <<< "$query")&count=5" \
+          -H "Accept: application/json" \
+          -H "X-Subscription-Token: ${BRAVE_API_KEY:-}" 2>/dev/null | jq -r '.web.results[].description // empty' 2>/dev/null | head -5)
+      fi
+      
+      search_count=$((search_count + 1))
+      
+      # Analyze search results with GLM-5
+      if [[ -n "$search_results" ]]; then
+        verbose "$agent_id: Analyzing search results..."
+        local analysis_response=$(zai_analyze_results "$query" "$search_results")
+        local analysis=$(zai_extract_content "$analysis_response")
+        local usage=$(zai_extract_usage "$analysis_response")
+        
+        loop_input_tokens=$((loop_input_tokens + $(echo "$usage" | jq -r '.prompt_tokens // 0')))
+        loop_output_tokens=$((loop_output_tokens + $(echo "$usage" | jq -r '.completion_tokens // 0')))
+        
+        loop_findings="$loop_findings
+
+**Query:** $query
+**Insights:**
+$analysis"
+      fi
+    done <<< "$queries"
+    
+    # Accumulate findings and costs
     all_findings="$all_findings
 
+--- LOOP $current_loop ---
+Searches performed: $search_count
 $loop_findings"
-    total_cost=$(echo "scale=2; $total_cost + $loop_cost" | bc)
-    total_input_tokens=$((total_input_tokens + loop_input))
-    total_output_tokens=$((total_output_tokens + loop_output))
+    total_input_tokens=$((total_input_tokens + loop_input_tokens))
+    total_output_tokens=$((total_output_tokens + loop_output_tokens))
     
     # Update progress
-    agent_result=$(echo "$agent_result" | jq ".loops_completed = $current_loop | .findings[\"loop_$current_loop\"] = $(json_escape "$loop_findings")")
+    agent_result=$(echo "$agent_result" | jq --arg loop "$current_loop" --arg findings "$loop_findings" '.loops_completed = ($loop | tonumber) | .findings[$loop] = $findings')
     echo "$agent_result" > "$output_file"
-    
-    # Small delay between loops
-    sleep 0.1
   done
   
   # Finalize
@@ -159,11 +194,11 @@ generate_followup_queries() {
   local findings="$2"
   
   # Use GLM-5 to identify gaps and generate queries
-  local synthesis=$(zai_synthesize "$findings" "$topic")
-  local content=$(zai_extract_content "$synthesis")
+  local synthesis_response=$(zai_synthesize_findings "$findings" "$topic")
+  local content=$(zai_extract_content "$synthesis_response")
   
-  # Extract queries from synthesis (simplified, macOS compatible)
-  echo "$content" | grep -oE '(follow-up|query|search).{0,100}' | head -3
+  # Extract suggested follow-up questions from the synthesis
+  echo "$content" | grep -iE '(follow.up|next query|search for|investigate)' | head -3
 }
 
 # Collect results from all agents

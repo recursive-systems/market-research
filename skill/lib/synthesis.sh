@@ -11,32 +11,37 @@ synthesize_results() {
   
   # Parse agent results
   local agent_count=$(echo "$all_results" | jq 'length')
-  local total_sources=$(echo "$all_results" | jq '[.[].sources | length] | add // 0')
   local total_cost=$(echo "$all_results" | jq -r '[.[].cost_estimate // "$0.00" | ltrimstr("$") | tonumber] | add // 0')
   
-  # Build findings summary (all_results is already an array)
-  local findings_summary=$(echo "$all_results" | jq '
-    {
-      competitors: [.[].findings.competitors // [] | .[]] | unique,
-      trends: [.[].findings.trends // [] | .[]] | unique,
-      pricing: [.[].findings.pricing // [] | .[]] | unique,
-      customers: [.[].findings.customers // [] | .[]] | unique,
-      gaps: [.[].findings.gaps // [] | .[]] | unique
-    }
-  ')
+  # Collect all findings into one text blob
+  local all_findings=$(echo "$all_results" | jq -r '.[].findings | to_entries | map("\(.key):\n\(.value)") | join("\n\n---\n\n")')
   
-  # Generate output based on format
-  case $output_format in
-    json)
-      generate_json_output "$topic" "$findings_summary" "$all_results" "$total_cost"
-      ;;
-    brief)
-      generate_brief_output "$topic" "$findings_summary" "$all_results"
-      ;;
-    *)
-      generate_markdown_output "$topic" "$findings_summary" "$all_results" "$total_cost"
-      ;;
-  esac
+  # Generate final report using z.ai GLM-5
+  local report_response=$(zai_generate_report "$all_findings" "$topic" "$output_format")
+  local report=$(zai_extract_content "$report_response")
+  local usage=$(zai_extract_usage "$report_response")
+  
+  # Add cost of report generation
+  local report_cost=$(zai_calculate_cost "$usage")
+  local total_cost_with_report=$(echo "scale=2; $total_cost + $report_cost" | bc)
+  
+  # Return the report with metadata
+  if [[ "$output_format" == "json" ]]; then
+    # For JSON, wrap the report in proper JSON structure
+    echo "$report" | jq -Rs "{
+      \"research_topic\": \"$topic\",
+      \"generated_at\": \"$(timestamp)\",
+      \"methodology\": {
+        \"model\": \"z.ai GLM-5\",
+        \"agents\": $agent_count,
+        \"total_cost_usd\": $total_cost_with_report
+      },
+      \"report\": .
+    }"
+  else
+    # For markdown/brief, return as-is with header
+    echo "$report"
+  fi
 }
 
 # Generate markdown output

@@ -30,7 +30,8 @@ zai_chat_completion() {
   local tools="${3:-[]}"
   local temperature="${4:-0.7}"
   
-  local payload=$(cat << EOF
+  local payload_file=$(mktemp)
+  cat > "$payload_file" << EOF
 {
   "model": "$model",
   "messages": $messages,
@@ -39,49 +40,49 @@ zai_chat_completion() {
   "max_tokens": 4096
 }
 EOF
-)
   
   curl -s -X POST \
     -H "Authorization: Bearer $ZAI_API_KEY" \
     -H "Content-Type: application/json" \
-    -d "$payload" \
+    -d "@$payload_file" \
     "$ZAI_API_URL/chat/completions"
+  
+  rm -f "$payload_file"
 }
 
-# Make web search via z.ai's built-in tool
-# Usage: zai_web_search "query"
-zai_web_search() {
-  local query="$1"
+# Simple chat (no tools) - most reliable
+# Usage: zai_chat "system_prompt" "user_message"
+zai_chat() {
+  local system_prompt="$1"
+  local user_message="$2"
+  local temperature="${3:-0.7}"
   
-  local messages='[{"role": "user", "content": "Search for: '"$query"'"}]'
-  local tools='[{
-    "type": "function",
-    "function": {
-      "name": "web_search",
-      "description": "Search the web for information",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": {"type": "string"}
-        },
-        "required": ["query"]
-      }
-    }
-  }]'
+  local payload_file=$(mktemp)
+  cat > "$payload_file" << EOF
+{
+  "model": "glm-5",
+  "messages": [
+    {"role": "system", "content": $(jq -Rs . <<< "$system_prompt")},
+    {"role": "user", "content": $(jq -Rs . <<< "$user_message")}
+  ],
+  "temperature": $temperature,
+  "max_tokens": 4096
+}
+EOF
   
-  zai_chat_completion "glm-5" "$messages" "$tools"
+  curl -s -X POST \
+    -H "Authorization: Bearer $ZAI_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "@$payload_file" \
+    "$ZAI_API_URL/chat/completions"
+  
+  rm -f "$payload_file"
 }
 
 # Extract content from response
 zai_extract_content() {
   local response="$1"
   echo "$response" | jq -r '.choices[0].message.content // empty'
-}
-
-# Extract tool calls from response
-zai_extract_tool_calls() {
-  local response="$1"
-  echo "$response" | jq -r '.choices[0].message.tool_calls // []'
 }
 
 # Get token usage from response
@@ -96,49 +97,88 @@ zai_generate_queries() {
   local focus="$2"
   local count="${3:-5}"
   
-  local system_prompt="You are a market research expert. Generate $count effective web search queries for researching '$topic' with focus on '$focus'. Return ONLY a JSON array of query strings."
+  local system_prompt="You are a market research expert. Generate $count specific web search queries for researching '$topic' with focus on '$focus'. Return as a simple bullet list, one query per line."
   
-  local messages="[\n    {\"role\": \"system\", \"content\": $(json_escape "$system_prompt")},\n    {\"role\": \"user\", \"content\": \"Generate search queries\"}\n  ]"
+  local user_message="Generate $count search queries about $topic focusing on $focus"
   
-  local response=$(zai_chat_completion "glm-5" "$messages" "[]" "0.3")
+  local response=$(zai_chat "$system_prompt" "$user_message" "0.3")
   local content=$(zai_extract_content "$response")
   
-  # Try to extract JSON array from content (macOS compatible)
-  echo "$content" | grep -oE '\[[^\]]*\]' | head -1
+  # Extract lines that look like queries (bullet points or numbered)
+  echo "$content" | grep -E '^[-•*0-9]' | sed 's/^[-•*0-9.]* *//' | head -$count
 }
 
-# Synthesize findings via GLM-5
-zai_synthesize() {
-  local findings="$1"
-  local topic="$2"
+# Analyze search results and extract insights
+zai_analyze_results() {
+  local query="$1"
+  local search_results="$2"
   
-  local system_prompt="You are a market research analyst. Synthesize the following research findings about '$topic'. Identify key insights, gaps in knowledge, and generate 2-3 follow-up questions for deeper research. Return structured JSON."
+  local system_prompt="You are a market research analyst. Analyze these web search results and extract key insights, facts, and data points. Be concise. Format as bullet points."
   
-  local messages="[\n    {\"role\": \"system\", \"content\": $(json_escape "$system_prompt")},\n    {\"role\": \"user\", \"content\": $(json_escape "$findings")}\n  ]"
+  local user_message="Query: $query
+
+Search Results:
+$search_results
+
+Extract key insights and facts:"
   
-  zai_chat_completion "glm-5" "$messages"
+  zai_chat "$system_prompt" "$user_message" "0.5"
 }
 
-# Final synthesis and formatting
-zai_final_synthesis() {
+# Synthesize all findings
+zai_synthesize_findings() {
   local all_findings="$1"
   local topic="$2"
-  local output_format="$3"
+  
+  local system_prompt="You are a market research analyst. Synthesize these research findings about '$topic'. Identify patterns, gaps, and key insights. Suggest 2-3 follow-up questions for deeper research."
+  
+  local user_message="Research findings:
+
+$all_findings
+
+Synthesize and identify gaps:"
+  
+  zai_chat "$system_prompt" "$user_message" "0.5"
+}
+
+# Generate final report
+zai_generate_report() {
+  local all_findings="$1"
+  local topic="$2"
+  local output_format="${3:-markdown}"
   
   local system_prompt
   case $output_format in
     json)
-      system_prompt="You are a market research analyst. Create a comprehensive JSON report on '$topic' from the following research findings. Include all data with sources."
+      system_prompt="You are a market research analyst. Create a structured JSON report with sections: market_size, competitors (array), trends (array), pricing_insights, customer_insights, opportunities. Include source confidence ratings."
       ;;
     brief)
-      system_prompt="You are a market research analyst. Create a 1-page executive summary on '$topic' from the following findings. Focus on key takeaways only."
+      system_prompt="You are a market research analyst. Create a 1-page executive summary. Include: market size estimate, top 3 competitors, 3 key trends, top opportunity. Be concise."
       ;;
     *)
-      system_prompt="You are a market research analyst. Create a comprehensive market research report on '$topic' from the following findings. Use markdown with clear sections, tables, and source citations."
+      system_prompt="You are a market research analyst. Create a comprehensive market research report with markdown formatting. Include: Executive Summary, Market Landscape (with data), Competitive Landscape (table), Customer Insights, Pricing Analysis, Opportunities. Use clear headers and bullet points. Cite sources where possible."
       ;;
   esac
   
-  local messages="[\n    {\"role\": \"system\", \"content\": $(json_escape "$system_prompt")},\n    {\"role\": \"user\", \"content\": $(json_escape "$all_findings")}\n  ]"
+  local user_message="Create a report on: $topic
+
+Research data:
+$all_findings
+
+Generate the report:"
   
-  zai_chat_completion "glm-5" "$messages"
+  zai_chat "$system_prompt" "$user_message" "0.7"
+}
+
+# Calculate cost from usage
+zai_calculate_cost() {
+  local usage_json="$1"
+  local input_tokens=$(echo "$usage_json" | jq -r '.prompt_tokens // 0')
+  local output_tokens=$(echo "$usage_json" | jq -r '.completion_tokens // 0')
+  
+  # GLM-5 pricing: $1/1M input, $3.20/1M output
+  local input_cost=$(echo "scale=4; $input_tokens * 1 / 1000000" | bc)
+  local output_cost=$(echo "scale=4; $output_tokens * 3.2 / 1000000" | bc)
+  
+  echo "scale=2; $input_cost + $output_cost" | bc
 }
