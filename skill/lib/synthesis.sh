@@ -65,14 +65,24 @@ EOF
   # Try to convert to PDF
   local pdf_success=false
   
-  if /opt/homebrew/bin/pandoc --version &> /dev/null || command -v pandoc &> /dev/null; then
-    # Try pandoc with pdf-engine first, then without
-    if pandoc "$md_file" -o "$output_file" --pdf-engine=xelatex 2>/dev/null; then
-      pdf_success=true
-    elif pandoc "$md_file" -o "$output_file" 2>/dev/null; then
+  # Try weasyprint first (Python-based, just installed)
+  if command -v weasyprint &> /dev/null || [[ -f "$HOME/Library/Python/3.9/bin/weasyprint" ]]; then
+    local weasyprint_cmd="weasyprint"
+    [[ -f "$HOME/Library/Python/3.9/bin/weasyprint" ]] && weasyprint_cmd="$HOME/Library/Python/3.9/bin/weasyprint"
+    if $weasyprint_cmd "$html_file" "$output_file" 2>/dev/null; then
       pdf_success=true
     fi
-  elif command -v wkhtmltopdf &> /dev/null; then
+  fi
+  
+  # Fallback to pandoc
+  if [[ "$pdf_success" != "true" ]] && (command -v pandoc &> /dev/null); then
+    if pandoc "$md_file" -o "$output_file" --pdf-engine=xelatex 2>/dev/null || pandoc "$md_file" -o "$output_file" 2>/dev/null; then
+      pdf_success=true
+    fi
+  fi
+  
+  # Fallback to wkhtmltopdf
+  if [[ "$pdf_success" != "true" ]] && command -v wkhtmltopdf &> /dev/null; then
     if wkhtmltopdf --quiet --enable-local-file-access "$html_file" "$output_file" 2>/dev/null; then
       pdf_success=true
     fi
@@ -81,7 +91,7 @@ EOF
   if [[ "$pdf_success" != "true" ]]; then
     # Fallback: create a styled HTML file that can be printed to PDF
     cp "$html_file" "${output_file%.pdf}.html"
-    echo "PDF generation requires wkhtmltopdf or pandoc with LaTeX. HTML version saved to: ${output_file%.pdf}.html" >&2
+    echo "PDF generation failed. HTML version saved to: ${output_file%.pdf}.html" >&2
     rm -rf "$tmp_dir"
     return 1
   fi
