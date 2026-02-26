@@ -166,7 +166,7 @@ cache_results "$TOPIC" "$DEPTH" "$FOCUS" "$FINAL_OUTPUT"
 # Handle output based on format
 if [[ "$OUTPUT" == "pdf" ]]; then
   # Generate PDF
-  local pdf_file="$HOME/.openclaw/market-research-reports/Research-${TOPIC// /_}-$(date +%Y%m%d-%H%M%S).pdf"
+  pdf_file="$HOME/.openclaw/market-research-reports/Research-${TOPIC// /_}-$(date +%Y%m%d-%H%M%S).pdf"
   mkdir -p "$HOME/.openclaw/market-research-reports"
   
   info "→ Generating PDF..."
