@@ -165,9 +165,9 @@ cache_results "$TOPIC" "$DEPTH" "$FOCUS" "$FINAL_OUTPUT"
 
 # Handle output based on format
 if [[ "$OUTPUT" == "pdf" ]]; then
-  # Generate PDF
-  pdf_file="$HOME/.openclaw/market-research-reports/Research-${TOPIC// /_}-$(date +%Y%m%d-%H%M%S).pdf"
-  mkdir -p "$HOME/.openclaw/market-research-reports"
+  # Generate PDF to workspace-dev (allowed directory for Discord attachments)
+  pdf_file="$HOME/.openclaw/workspace-dev/market-research-reports/Research-${TOPIC// /_}-$(date +%Y%m%d-%H%M%S).pdf"
+  mkdir -p "$HOME/.openclaw/workspace-dev/market-research-reports"
   
   info "→ Generating PDF..."
   if generate_pdf "$FINAL_OUTPUT" "$pdf_file" "$TOPIC"; then
